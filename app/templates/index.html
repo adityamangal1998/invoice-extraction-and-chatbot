@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invoice Extraction & Chatbot</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-file-invoice me-2"></i>
+                Invoice AI
+            </a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="/">
+                    <i class="fas fa-upload me-1"></i>
+                    Extract
+                </a>
+                <a class="nav-link" href="/chat">
+                    <i class="fas fa-comments me-1"></i>
+                    Chat
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row justify-content-center">
+            <div class="col-lg-10">
+                <!-- Header -->
+                <div class="text-center mb-5">
+                    <h1 class="display-4 text-primary">
+                        <i class="fas fa-robot me-3"></i>
+                        Invoice Data Extraction
+                    </h1>
+                    <p class="lead text-muted">
+                        Upload an invoice image and let AI extract structured data using Claude 3.5 Vision
+                    </p>
+                </div>
+
+                <!-- Upload Section -->
+                <div class="card shadow-lg mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h3 class="card-title mb-0">
+                            <i class="fas fa-cloud-upload-alt me-2"></i>
+                            Upload Invoice
+                        </h3>
+                    </div>
+                    <div class="card-body">
+                        <form id="uploadForm" enctype="multipart/form-data">
+                            <div class="mb-3">
+                                <label for="invoice_file" class="form-label">
+                                    <i class="fas fa-image me-2"></i>
+                                    Select Invoice Image
+                                </label>
+                                <input type="file" class="form-control" id="invoice_file" name="invoice_file" 
+                                       accept=".png,.jpg,.jpeg,.gif,.bmp,.webp" required>
+                                <div class="form-text">
+                                    Supported formats: PNG, JPG, JPEG, GIF, BMP, WEBP (Max: 16MB)
+                                </div>
+                            </div>
+                            <div class="d-grid">
+                                <button type="submit" class="btn btn-primary btn-lg" id="extractBtn">
+                                    <i class="fas fa-magic me-2"></i>
+                                    Extract Invoice Data
+                                </button>
+                                <button type="button" class="btn btn-secondary mt-2" onclick="testFetch()">
+                                    🧪 Test Connection
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Loading Indicator -->
+                <div id="loadingIndicator" class="text-center d-none">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2">Processing invoice with AI...</p>
+                </div>
+
+                <!-- Alert Messages -->
+                <div id="alertContainer"></div>
+
+                <!-- Zoom Controls Demo (Always Visible) -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-search me-2"></i>
+                            Zoom Controls Demo
+                        </h5>
+                    </div>
+                    <div class="card-body text-center">
+                        <p class="mb-3">Upload an invoice to use these zoom controls:</p>
+                        <div class="btn-group" role="group" aria-label="Demo zoom controls">
+                            <button type="button" class="btn btn-outline-primary" onclick="demoZoomOut()" title="Zoom Out">
+                                <i class="fas fa-search-minus me-1"></i>
+                                Zoom Out
+                            </button>
+                            <button type="button" class="btn btn-outline-primary" onclick="demoResetZoom()" title="Reset Zoom">
+                                <span id="demoZoomLevel">100%</span>
+                            </button>
+                            <button type="button" class="btn btn-outline-primary" onclick="demoZoomIn()" title="Zoom In">
+                                <i class="fas fa-search-plus me-1"></i>
+                                Zoom In
+                            </button>
+                        </div>
+                        <div class="mt-3">
+                            <small class="text-muted">
+                                <i class="fas fa-info-circle me-1"></i>
+                                These buttons will control the uploaded invoice image
+                            </small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Results Section -->
+                <div id="resultsSection" class="d-none">
+                    <div class="card shadow-lg">
+                        <div class="card-header bg-success text-white">
+                            <h3 class="card-title mb-0">
+                                <i class="fas fa-check-circle me-2"></i>
+                                Extracted Data
+                            </h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <!-- Invoice Image Preview -->
+                                <div class="col-md-4 mb-4">
+                                    <h5 class="mb-3">
+                                        <i class="fas fa-image me-2"></i>
+                                        Invoice Image
+                                    </h5>
+                                    <div class="invoice-image-container">
+                                        <img id="invoicePreview" src="" alt="Invoice" class="img-fluid rounded border shadow-sm invoice-thumbnail" style="max-height: 400px; width: 100%; object-fit: contain; cursor: pointer;" onclick="openImageZoom()">
+                                        <div class="mt-2 text-center">
+                                            <small class="text-muted">
+                                                <i class="fas fa-search-plus me-1"></i>
+                                                Click to zoom
+                                            </small>
+                                        </div>
+                                        <!-- Zoom Control Buttons -->
+                                        <div class="mt-2 text-center">
+                                            <div class="btn-group" role="group" aria-label="Zoom controls">
+                                                <button type="button" class="btn btn-outline-primary btn-sm" onclick="mainZoomOut()" title="Zoom Out">
+                                                    <i class="fas fa-search-minus"></i>
+                                                </button>
+                                                <button type="button" class="btn btn-outline-primary btn-sm" onclick="mainResetZoom()" title="Reset Zoom">
+                                                    <span id="mainZoomLevel">100%</span>
+                                                </button>
+                                                <button type="button" class="btn btn-outline-primary btn-sm" onclick="mainZoomIn()" title="Zoom In">
+                                                    <i class="fas fa-search-plus"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Summary Cards -->
+                                <div class="col-md-8 mb-4">
+                                    <h5 class="mb-3">
+                                        <i class="fas fa-chart-bar me-2"></i>
+                                        Key Information
+                                    </h5>
+                                    <div class="row" id="summaryCards">
+                                        <!-- Dynamic summary cards will be inserted here -->
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="row">
+                                <!-- Full JSON Data -->
+                                <div class="col-md-12">
+                                    <h5 class="mb-3">
+                                        <i class="fas fa-code me-2"></i>
+                                        Complete Extracted Data
+                                    </h5>
+                                    <div class="position-relative">
+                                        <button class="btn btn-outline-secondary btn-sm position-absolute top-0 end-0 m-2" 
+                                                onclick="copyToClipboard()" id="copyBtn">
+                                            <i class="fas fa-copy me-1"></i>
+                                            Copy
+                                        </button>
+                                        <pre id="jsonResult" class="p-3 rounded border"></pre>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Action Buttons -->
+                            <div class="mt-4 text-center">
+                                <a href="/chat" class="btn btn-primary btn-lg me-3">
+                                    <i class="fas fa-comments me-2"></i>
+                                    Chat About This Invoice
+                                </a>
+                                <button type="button" class="btn btn-outline-secondary btn-lg" onclick="resetForm()">
+                                    <i class="fas fa-redo me-2"></i>
+                                    Upload Another
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Form submission handling
+        document.getElementById('uploadForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData();
+            const fileInput = document.getElementById('invoice_file');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                showAlert('Please select a file to upload', 'warning');
+                return;
+            }
+            
+            formData.append('invoice_file', file);
+            
+            // Show loading
+            showLoading(true);
+            hideResults();
+            clearAlerts();
+            
+            try {
+                console.log('Starting upload request...');
+                console.log('File:', file.name, file.type, file.size);
+                
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                console.log('Response received:', response.status, response.statusText);
+                
+                const result = await response.json();
+                console.log('Response data:', result);
+                
+                if (result.success) {
+                    displayResults(result.data, result.formatted_data, result.image_url);
+                    showAlert('Invoice data extracted successfully!', 'success');
+                } else {
+                    showAlert(`Error: ${result.error}`, 'danger');
+                }
+            } catch (error) {
+                console.error('Upload error:', error);
+                console.error('Error details:', error.message, error.stack);
+                showAlert(`Network error: ${error.message}`, 'danger');
+            } finally {
+                showLoading(false);
+            }
+        });
+        
+        function showLoading(show) {
+            const loading = document.getElementById('loadingIndicator');
+            const btn = document.getElementById('extractBtn');
+            
+            if (show) {
+                loading.classList.remove('d-none');
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Processing...';
+            } else {
+                loading.classList.add('d-none');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-magic me-2"></i>Extract Invoice Data';
+            }
+        }
+        
+        function showAlert(message, type) {
+            const container = document.getElementById('alertContainer');
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type} alert-dismissible fade show`;
+            alert.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            container.appendChild(alert);
+        }
+        
+        function clearAlerts() {
+            document.getElementById('alertContainer').innerHTML = '';
+        }
+        
+        function displayResults(data, formattedData, imageUrl) {
+            // Show invoice image
+            if (imageUrl) {
+                const invoicePreview = document.getElementById('invoicePreview');
+                invoicePreview.src = imageUrl;
+                invoicePreview.style.display = 'block';
+            }
+            
+            // Show results section
+            document.getElementById('resultsSection').classList.remove('d-none');
+            
+            // Display JSON data
+            document.getElementById('jsonResult').textContent = formattedData;
+            
+            // Create summary cards
+            createSummaryCards(data);
+            
+            // Scroll to results
+            document.getElementById('resultsSection').scrollIntoView({ behavior: 'smooth' });
+        }
+        
+        function createSummaryCards(data) {
+            const container = document.getElementById('summaryCards');
+            container.innerHTML = '';
+            
+            // Define key fields to highlight
+            const keyFields = [
+                { key: 'invoice_number', label: 'Invoice #', icon: 'fas fa-hashtag' },
+                { key: 'total_amount', label: 'Total Amount', icon: 'fas fa-dollar-sign' },
+                { key: 'invoice_date', label: 'Date', icon: 'fas fa-calendar' },
+                { key: 'due_date', label: 'Due Date', icon: 'fas fa-clock' }
+            ];
+            
+            keyFields.forEach(field => {
+                let value = data[field.key];
+                if (value !== undefined && value !== null) {
+                    if (field.key.includes('amount') && typeof value === 'number') {
+                        value = `$${value.toFixed(2)}`;
+                    }
+                    
+                    const card = document.createElement('div');
+                    card.className = 'col-md-3 col-sm-6 mb-3';
+                    card.innerHTML = `
+                        <div class="card bg-light">
+                            <div class="card-body text-center">
+                                <i class="${field.icon} fa-2x text-primary mb-2"></i>
+                                <h6 class="card-title">${field.label}</h6>
+                                <p class="card-text fw-bold">${value}</p>
+                            </div>
+                        </div>
+                    `;
+                    container.appendChild(card);
+                }
+            });
+            
+            // Add vendor info if available
+            if (data.vendor && data.vendor.name) {
+                const card = document.createElement('div');
+                card.className = 'col-md-3 col-sm-6 mb-3';
+                card.innerHTML = `
+                    <div class="card bg-light">
+                        <div class="card-body text-center">
+                            <i class="fas fa-building fa-2x text-primary mb-2"></i>
+                            <h6 class="card-title">Vendor</h6>
+                            <p class="card-text fw-bold">${data.vendor.name}</p>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(card);
+            }
+        }
+        
+        function hideResults() {
+            document.getElementById('resultsSection').classList.add('d-none');
+        }
+        
+        function resetForm() {
+            document.getElementById('uploadForm').reset();
+            hideResults();
+            clearAlerts();
+        }
+        
+        function copyToClipboard() {
+            const text = document.getElementById('jsonResult').textContent;
+            navigator.clipboard.writeText(text).then(() => {
+                const btn = document.getElementById('copyBtn');
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '<i class="fas fa-check me-1"></i>Copied!';
+                btn.classList.add('btn-success');
+                btn.classList.remove('btn-outline-secondary');
+                
+                setTimeout(() => {
+                    btn.innerHTML = originalText;
+                    btn.classList.remove('btn-success');
+                    btn.classList.add('btn-outline-secondary');
+                }, 2000);
+            });
+        }
+        
+        // Test function for debugging fetch issues
+        async function testFetch() {
+            console.log('Testing fetch connection...');
+            try {
+                const response = await fetch('/test', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({test: 'data'})
+                });
+                
+                console.log('Test response:', response.status, response.statusText);
+                const result = await response.json();
+                console.log('Test result:', result);
+                showAlert('✅ Connection test successful!', 'success');
+            } catch (error) {
+                console.error('Test error:', error);
+                showAlert(`❌ Connection test failed: ${error.message}`, 'danger');
+            }
+        }
+    </script>
+
+    <!-- Image Zoom Modal -->
+    <div class="modal fade" id="imageZoomModal" tabindex="-1" aria-labelledby="imageZoomModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-fullscreen-sm-down">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="imageZoomModalLabel">
+                        <i class="fas fa-image me-2"></i>
+                        Invoice Image - <span id="modalFileName">invoice.jpg</span>
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-1">
+                    <div class="image-zoom-container position-relative">
+                        <img id="zoomedImage" src="" alt="Invoice" class="img-fluid w-100 h-100" style="object-fit: contain; max-height: 80vh;">
+                        
+                        <!-- Zoom Controls -->
+                        <div class="zoom-controls position-absolute top-0 end-0 m-3">
+                            <div class="btn-group-vertical" role="group">
+                                <button type="button" class="btn btn-dark btn-sm" onclick="zoomIn()" title="Zoom In">
+                                    <i class="fas fa-plus"></i>
+                                </button>
+                                <button type="button" class="btn btn-dark btn-sm" onclick="zoomOut()" title="Zoom Out">
+                                    <i class="fas fa-minus"></i>
+                                </button>
+                                <button type="button" class="btn btn-dark btn-sm" onclick="resetZoom()" title="Reset Zoom">
+                                    <i class="fas fa-expand-arrows-alt"></i>
+                                </button>
+                                <button type="button" class="btn btn-dark btn-sm" onclick="toggleFullscreen()" title="Fullscreen">
+                                    <i class="fas fa-expand"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Zoom Level Indicator -->
+                        <div class="zoom-indicator position-absolute bottom-0 start-0 m-3">
+                            <span class="badge bg-dark" id="zoomLevel">100%</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="downloadImage()">
+                        <i class="fas fa-download me-2"></i>
+                        Download
+                    </button>
+                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-2"></i>
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Image zoom functionality
+        let currentZoom = 1;
+        const zoomStep = 0.2;
+        const minZoom = 0.5;
+        const maxZoom = 3;
+
+        // Main screen zoom functionality
+        let mainCurrentZoom = 1;
+        const mainZoomStep = 0.2;
+        const mainMinZoom = 0.5;
+        const mainMaxZoom = 2;
+
+        function mainZoomIn() {
+            if (mainCurrentZoom < mainMaxZoom) {
+                mainCurrentZoom = Math.min(mainCurrentZoom + mainZoomStep, mainMaxZoom);
+                applyMainZoom();
+            }
+        }
+
+        function mainZoomOut() {
+            if (mainCurrentZoom > mainMinZoom) {
+                mainCurrentZoom = Math.max(mainCurrentZoom - mainZoomStep, mainMinZoom);
+                applyMainZoom();
+            }
+        }
+
+        function mainResetZoom() {
+            mainCurrentZoom = 1;
+            applyMainZoom();
+        }
+
+        function applyMainZoom() {
+            const invoicePreview = document.getElementById('invoicePreview');
+            const mainZoomLevel = document.getElementById('mainZoomLevel');
+            const demoZoomLevel = document.getElementById('demoZoomLevel');
+            
+            if (invoicePreview) {
+                invoicePreview.style.transform = `scale(${mainCurrentZoom})`;
+                invoicePreview.style.transformOrigin = 'center';
+                if (mainZoomLevel) mainZoomLevel.textContent = `${Math.round(mainCurrentZoom * 100)}%`;
+            }
+            
+            // Update demo zoom level indicator
+            if (demoZoomLevel) {
+                demoZoomLevel.textContent = `${Math.round(mainCurrentZoom * 100)}%`;
+            }
+        }
+
+        // Demo zoom functions (same as main zoom but with visual feedback)
+        function demoZoomIn() {
+            mainZoomIn();
+            showZoomFeedback('Zoom In');
+        }
+
+        function demoZoomOut() {
+            mainZoomOut();
+            showZoomFeedback('Zoom Out');
+        }
+
+        function demoResetZoom() {
+            mainResetZoom();
+            showZoomFeedback('Reset Zoom');
+        }
+
+        function showZoomFeedback(action) {
+            // Show a brief message about zoom action
+            const alertContainer = document.getElementById('alertContainer');
+            if (alertContainer) {
+                const alert = document.createElement('div');
+                alert.className = 'alert alert-info alert-dismissible fade show';
+                alert.innerHTML = `
+                    <i class="fas fa-search me-2"></i>
+                    ${action} ${mainCurrentZoom > 1 ? 'activated' : mainCurrentZoom < 1 ? 'activated' : 'to 100%'}
+                    ${!document.getElementById('invoicePreview').src ? ' (Upload an invoice to see the effect)' : ''}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                `;
+                alertContainer.appendChild(alert);
+                
+                // Auto dismiss after 3 seconds
+                setTimeout(() => {
+                    if (alert.parentNode) {
+                        alert.remove();
+                    }
+                }, 3000);
+            }
+        }
+
+        function openImageZoom() {
+            const invoicePreview = document.getElementById('invoicePreview');
+            const zoomedImage = document.getElementById('zoomedImage');
+            const modalFileName = document.getElementById('modalFileName');
+            
+            if (invoicePreview.src) {
+                zoomedImage.src = invoicePreview.src;
+                modalFileName.textContent = invoicePreview.alt || 'invoice.jpg';
+                resetZoom();
+                
+                const modal = new bootstrap.Modal(document.getElementById('imageZoomModal'));
+                modal.show();
+            }
+        }
+
+        function zoomIn() {
+            if (currentZoom < maxZoom) {
+                currentZoom = Math.min(currentZoom + zoomStep, maxZoom);
+                applyZoom();
+            }
+        }
+
+        function zoomOut() {
+            if (currentZoom > minZoom) {
+                currentZoom = Math.max(currentZoom - zoomStep, minZoom);
+                applyZoom();
+            }
+        }
+
+        function resetZoom() {
+            currentZoom = 1;
+            applyZoom();
+        }
+
+        function applyZoom() {
+            const zoomedImage = document.getElementById('zoomedImage');
+            const zoomLevel = document.getElementById('zoomLevel');
+            
+            zoomedImage.style.transform = `scale(${currentZoom})`;
+            zoomLevel.textContent = `${Math.round(currentZoom * 100)}%`;
+        }
+
+        function toggleFullscreen() {
+            const modal = document.getElementById('imageZoomModal');
+            
+            if (!document.fullscreenElement) {
+                modal.requestFullscreen().catch(err => {
+                    console.log(`Error attempting to enable fullscreen: ${err.message}`);
+                });
+            } else {
+                document.exitFullscreen();
+            }
+        }
+
+        function downloadImage() {
+            const invoicePreview = document.getElementById('invoicePreview');
+            
+            if (invoicePreview.src) {
+                const link = document.createElement('a');
+                link.href = invoicePreview.src;
+                link.download = 'invoice.jpg';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+        }
+
+        // Mouse wheel zoom in modal
+        document.getElementById('imageZoomModal').addEventListener('wheel', function(e) {
+            if (e.ctrlKey) {
+                e.preventDefault();
+                if (e.deltaY < 0) {
+                    zoomIn();
+                } else {
+                    zoomOut();
+                }
+            }
+        });
+
+        // Keyboard shortcuts for zoom
+        document.addEventListener('keydown', function(e) {
+            const modal = document.getElementById('imageZoomModal');
+            if (modal.classList.contains('show')) {
+                switch(e.key) {
+                    case '+':
+                    case '=':
+                        e.preventDefault();
+                        zoomIn();
+                        break;
+                    case '-':
+                        e.preventDefault();
+                        zoomOut();
+                        break;
+                    case '0':
+                        e.preventDefault();
+                        resetZoom();
+                        break;
+                    case 'f':
+                    case 'F':
+                        e.preventDefault();
+                        toggleFullscreen();
+                        break;
+                    case 'Escape':
+                        if (document.fullscreenElement) {
+                            document.exitFullscreen();
+                        }
+                        break;
+                }
+            }
+        });
+    </script>
+
+    <!-- Footer -->
+    <footer class="bg-light py-4 mt-5">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-6">
+                    <p class="mb-0 text-muted">
+                        <i class="fas fa-file-invoice me-2"></i>
+                        Invoice Extraction & Chatbot
+                    </p>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <p class="mb-0 text-muted">
+                        Made with ❤️ by TecoNico Pvt. Ltd.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

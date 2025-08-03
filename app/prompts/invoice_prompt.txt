@@ -1,0 +1,66 @@
+Please analyze this invoice image and extract all relevant information in a structured JSON format.
+
+Include the following information if available:
+- Invoice number
+- Invoice date
+- Due date
+- Vendor/Supplier information (name, address, contact details, tax ID)
+- Bill to/Customer information (name, address, contact details)
+- Line items with details (description, quantity, unit price, line total)
+- Subtotal before taxes
+- Tax information (rate, amount)
+- Total amount due
+- Payment terms and methods
+- Currency
+- Any additional notes or special instructions
+
+Requirements:
+1. Structure the response as a valid JSON object with clear, consistent field names
+2. Use proper data types (numbers for amounts, strings for text, arrays for lists)
+3. If any information is not clearly visible or available, use null values
+4. Ensure all monetary amounts are numbers (not strings)
+5. Format dates consistently (YYYY-MM-DD if possible)
+6. Include line items as an array of objects
+
+Example JSON structure:
+{
+  "invoice_number": "INV-2024-001",
+  "invoice_date": "2024-01-15",
+  "due_date": "2024-02-15",
+  "currency": "USD",
+  "vendor": {
+    "name": "ABC Company Inc.",
+    "address": "123 Business Ave, Suite 100, City, State 12345",
+    "email": "billing@abccompany.com",
+    "phone": "+1-555-123-4567",
+    "tax_id": "12-3456789"
+  },
+  "bill_to": {
+    "name": "XYZ Corporation",
+    "address": "456 Customer St, City, State 67890",
+    "contact_person": "John Doe"
+  },
+  "line_items": [
+    {
+      "description": "Professional Services - January 2024",
+      "quantity": 1,
+      "unit_price": 2500.00,
+      "line_total": 2500.00
+    },
+    {
+      "description": "Software License",
+      "quantity": 5,
+      "unit_price": 100.00,
+      "line_total": 500.00
+    }
+  ],
+  "subtotal": 3000.00,
+  "tax_rate": 0.0875,
+  "tax_amount": 262.50,
+  "total_amount": 3262.50,
+  "payment_terms": "Net 30 days",
+  "payment_methods": ["Bank Transfer", "Check"],
+  "notes": "Payment due within 30 days of invoice date"
+}
+
+Please provide only the JSON response without any additional text or formatting.

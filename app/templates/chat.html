@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invoice Chatbot - Invoice Extraction & Chatbot</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-file-invoice me-2"></i>
+                Invoice AI
+            </a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="/">
+                    <i class="fas fa-upload me-1"></i>
+                    Extract
+                </a>
+                <a class="nav-link active" href="/chat">
+                    <i class="fas fa-comments me-1"></i>
+                    Chat
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid mt-4">
+        <div class="row">
+            <!-- Left Panel - Invoice Image -->
+            <div class="col-lg-4 mb-4">
+                <div class="card h-100">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-image me-2"></i>
+                            Invoice Image
+                        </h5>
+                    </div>
+                    <div class="card-body d-flex flex-column">
+                        <div id="invoiceImageContainer" class="flex-grow-1 d-flex align-items-center justify-content-center">
+                            <div id="noInvoiceMessage" class="text-center text-muted">
+                                <i class="fas fa-upload fa-3x mb-3"></i>
+                                <p>No invoice uploaded yet</p>
+                                <a href="/" class="btn btn-primary">
+                                    <i class="fas fa-upload me-2"></i>
+                                    Upload Invoice
+                                </a>
+                            </div>
+                            <img id="invoiceImage" src="" alt="Invoice" class="img-fluid rounded border shadow-sm d-none invoice-thumbnail" style="max-height: 500px; max-width: 100%; object-fit: contain; cursor: pointer;" onclick="openImageZoom()">
+                        </div>
+                        <div id="invoiceInfo" class="mt-3 d-none">
+                            <small class="text-muted">
+                                <i class="fas fa-file me-1"></i>
+                                <span id="invoiceFileName">invoice.jpg</span>
+                            </small>
+                            <small class="text-muted ms-2">
+                                <i class="fas fa-search-plus me-1"></i>
+                                Click to zoom
+                            </small>
+                        </div>
+                        <!-- Chat Zoom Control Buttons -->
+                        <div id="chatZoomControls" class="mt-2 text-center d-none">
+                            <div class="btn-group" role="group" aria-label="Zoom controls">
+                                <button type="button" class="btn btn-outline-info btn-sm" onclick="chatZoomOut()" title="Zoom Out">
+                                    <i class="fas fa-search-minus"></i>
+                                </button>
+                                <button type="button" class="btn btn-outline-info btn-sm" onclick="chatResetZoom()" title="Reset Zoom">
+                                    <span id="chatZoomLevel">100%</span>
+                                </button>
+                                <button type="button" class="btn btn-outline-info btn-sm" onclick="chatZoomIn()" title="Zoom In">
+                                    <i class="fas fa-search-plus"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Right Panel - Chat Interface -->
+            <div class="col-lg-8">
+                <!-- Header -->
+                <div class="text-center mb-4">
+                    <h1 class="h3 text-primary">
+                        <i class="fas fa-robot me-2"></i>
+                        Invoice Chatbot
+                    </h1>
+                    <p class="text-muted">Ask questions about your uploaded invoice data</p>
+                </div>
+
+                <!-- Status Card -->
+                <div class="card mb-4" id="statusCard">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center">
+                            <div class="me-3">
+                                <i class="fas fa-info-circle fa-2x text-info"></i>
+                            </div>
+                            <div>
+                                <h6 class="mb-1">Current Status</h6>
+                                <p class="mb-0" id="statusText">Checking invoice data...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Zoom Controls Demo (Always Visible) -->
+                <div class="card mb-4">
+                    <div class="card-header bg-info text-white">
+                        <h6 class="card-title mb-0">
+                            <i class="fas fa-search me-2"></i>
+                            Image Zoom Controls
+                        </h6>
+                    </div>
+                    <div class="card-body text-center">
+                        <div class="btn-group" role="group" aria-label="Chat zoom controls">
+                            <button type="button" class="btn btn-outline-info btn-sm" onclick="demoChatZoomOut()" title="Zoom Out">
+                                <i class="fas fa-search-minus"></i>
+                            </button>
+                            <button type="button" class="btn btn-outline-info btn-sm" onclick="demoChatResetZoom()" title="Reset Zoom">
+                                <span id="demoChatZoomLevel">100%</span>
+                            </button>
+                            <button type="button" class="btn btn-outline-info btn-sm" onclick="demoChatZoomIn()" title="Zoom In">
+                                <i class="fas fa-search-plus"></i>
+                            </button>
+                        </div>
+                        <div class="mt-2">
+                            <small class="text-muted">Controls for invoice image zoom</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Chat Container -->
+                <div class="card shadow-lg chat-container">
+                    <div class="card-header bg-primary text-white">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">
+                                <i class="fas fa-comments me-2"></i>
+                                Chat with AI Assistant
+                            </h5>
+                            <button class="btn btn-outline-light btn-sm" onclick="clearChat()" id="clearChatBtn">
+                                <i class="fas fa-trash me-1"></i>
+                                Clear Chat
+                            </button>
+                        </div>
+                    </div>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Chat Messages -->
+                    <div class="card-body p-0">
+                        <div id="chatMessages" class="chat-messages">
+                            <div class="message bot-message">
+                                <div class="message-content">
+                                    <div class="d-flex align-items-start">
+                                        <div class="avatar bg-primary text-white rounded-circle me-3">
+                                            <i class="fas fa-robot"></i>
+                                        </div>
+                                        <div>
+                                            <strong>AI Assistant</strong>
+                                            <p class="mb-0 mt-1">
+                                                👋 Hello! I'm your intelligent invoice assistant. I can help you understand your invoice data in detail.
+                                            </p>
+                                            <div class="mt-3">
+                                                <strong>Try asking me:</strong>
+                                                <ul class="mt-2 mb-0" style="font-size: 0.9rem;">
+                                                    <li>💰 "What is the total amount on this invoice?"</li>
+                                                    <li>🏢 "Who is the vendor/supplier?"</li>
+                                                    <li>📅 "When is the payment due?"</li>
+                                                    <li>📋 "List all the items on this invoice"</li>
+                                                    <li>🔍 "What are the payment terms?"</li>
+                                                </ul>
+                                            </div>
+                                            <div class="mt-3 p-2 bg-light rounded">
+                                                <small class="text-muted">
+                                                    <i class="fas fa-info-circle me-1"></i>
+                                                    I can only answer questions about the currently uploaded invoice data.
+                                                </small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Chat Input -->
+                    <div class="card-footer bg-light">
+                        <form id="chatForm" class="d-flex align-items-center">
+                            <div class="input-group me-2">
+                                <input type="text" class="form-control" id="messageInput" 
+                                       placeholder="💬 Type your question here..." 
+                                       autocomplete="off"
+                                       style="border-radius: 25px 0 0 25px;">
+                                <button type="button" class="btn btn-outline-secondary" id="voiceBtn" title="Voice Input (Coming Soon)">
+                                    <i class="fas fa-microphone"></i>
+                                </button>
+                            </div>
+                            <button type="submit" class="btn btn-primary px-3" id="sendBtn" style="border-radius: 25px;">
+                                <i class="fas fa-paper-plane"></i>
+                                <span class="ms-1 d-none d-sm-inline">Send</span>
+                            </button>
+                        </form>
+                        
+                        <!-- Typing indicator -->
+                        <div id="typingIndicator" class="mt-2 d-none">
+                            <small class="text-muted">
+                                <i class="fas fa-robot me-1"></i>
+                                AI Assistant is thinking
+                                <span class="typing-dots">
+                                    <span>.</span><span>.</span><span>.</span>
+                                </span>
+                            </small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Suggested Questions -->
+                <div class="card mt-4" id="suggestionsCard">
+                    <div class="card-body">
+                        <h6 class="card-title">
+                            <i class="fas fa-lightbulb me-2 text-warning"></i>
+                            Quick Questions
+                        </h6>
+                        <div class="row g-2">
+                            <div class="col-md-6">
+                                <button class="btn btn-outline-primary btn-sm w-100 suggestion-btn" onclick="askQuestion('What is the total amount?')">
+                                    💰 Total Amount
+                                </button>
+                            </div>
+                            <div class="col-md-6">
+                                <button class="btn btn-outline-primary btn-sm w-100 suggestion-btn" onclick="askQuestion('Who is the vendor?')">
+                                    🏢 Vendor Info
+                                </button>
+                            </div>
+                            <div class="col-md-6">
+                                <button class="btn btn-outline-primary btn-sm w-100 suggestion-btn" onclick="askQuestion('When is the due date?')">
+                                    📅 Due Date
+                                </button>
+                            </div>
+                            <div class="col-md-6">
+                                <button class="btn btn-outline-primary btn-sm w-100 suggestion-btn" onclick="askQuestion('Show me all line items')">
+                                    📋 Line Items
+                                </button>
+                            </div>
+                            <div class="col-md-6">
+                                <button class="btn btn-outline-primary btn-sm w-100 suggestion-btn" onclick="askQuestion('What are the payment terms?')">
+                                    💳 Payment Terms
+                                </button>
+                            </div>
+                            <div class="col-md-6">
+                                <button class="btn btn-outline-primary btn-sm w-100 suggestion-btn" onclick="askQuestion('What is the invoice number?')">
+                                    🔢 Invoice Number
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Advanced Questions Toggle -->
+                        <div class="mt-3">
+                            <button class="btn btn-link btn-sm p-0" onclick="toggleAdvancedQuestions()" id="advancedToggle">
+                                <i class="fas fa-chevron-down me-1"></i>
+                                Show More Questions
+                            </button>
+                        </div>
+                        
+                        <!-- Advanced Questions (Hidden by default) -->
+                        <div id="advancedQuestions" class="d-none mt-3">
+                            <div class="row g-2">
+                                <div class="col-md-6">
+                                    <button class="btn btn-outline-secondary btn-sm w-100 suggestion-btn" onclick="askQuestion('What is the tax amount?')">
+                                        🧾 Tax Details
+                                    </button>
+                                </div>
+                                <div class="col-md-6">
+                                    <button class="btn btn-outline-secondary btn-sm w-100 suggestion-btn" onclick="askQuestion('What is the billing address?')">
+                                        📍 Billing Address
+                                    </button>
+                                </div>
+                                <div class="col-md-6">
+                                    <button class="btn btn-outline-secondary btn-sm w-100 suggestion-btn" onclick="askQuestion('Summarize this invoice')">
+                                        📊 Invoice Summary
+                                    </button>
+                                </div>
+                                <div class="col-md-6">
+                                    <button class="btn btn-outline-secondary btn-sm w-100 suggestion-btn" onclick="askQuestion('Are there any discounts?')">
+                                        🎯 Discounts
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
+    <script>
+        // Initialize chat on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            checkStatus();
+        });
+        
+        // Toggle advanced questions
+        function toggleAdvancedQuestions() {
+            const advancedQuestions = document.getElementById('advancedQuestions');
+            const toggleBtn = document.getElementById('advancedToggle');
+            
+            if (advancedQuestions.classList.contains('d-none')) {
+                advancedQuestions.classList.remove('d-none');
+                toggleBtn.innerHTML = '<i class="fas fa-chevron-up me-1"></i>Show Fewer Questions';
+            } else {
+                advancedQuestions.classList.add('d-none');
+                toggleBtn.innerHTML = '<i class="fas fa-chevron-down me-1"></i>Show More Questions';
+            }
+        }
+    </script>
+
+    <!-- Image Zoom Modal -->
+    <div class="modal fade" id="imageZoomModal" tabindex="-1" aria-labelledby="imageZoomModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-fullscreen-sm-down">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="imageZoomModalLabel">
+                        <i class="fas fa-image me-2"></i>
+                        Invoice Image - <span id="modalFileName">invoice.jpg</span>
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-1">
+                    <div class="image-zoom-container position-relative">
+                        <img id="zoomedImage" src="" alt="Invoice" class="img-fluid w-100 h-100" style="object-fit: contain; max-height: 80vh;">
+                        
+                        <!-- Zoom Controls -->
+                        <div class="zoom-controls position-absolute top-0 end-0 m-3">
+                            <div class="btn-group-vertical" role="group">
+                                <button type="button" class="btn btn-dark btn-sm" onclick="zoomIn()" title="Zoom In">
+                                    <i class="fas fa-plus"></i>
+                                </button>
+                                <button type="button" class="btn btn-dark btn-sm" onclick="zoomOut()" title="Zoom Out">
+                                    <i class="fas fa-minus"></i>
+                                </button>
+                                <button type="button" class="btn btn-dark btn-sm" onclick="resetZoom()" title="Reset Zoom">
+                                    <i class="fas fa-expand-arrows-alt"></i>
+                                </button>
+                                <button type="button" class="btn btn-dark btn-sm" onclick="toggleFullscreen()" title="Fullscreen">
+                                    <i class="fas fa-expand"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Zoom Level Indicator -->
+                        <div class="zoom-indicator position-absolute bottom-0 start-0 m-3">
+                            <span class="badge bg-dark" id="zoomLevel">100%</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="downloadImage()">
+                        <i class="fas fa-download me-2"></i>
+                        Download
+                    </button>
+                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-2"></i>
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Image zoom functionality
+        let currentZoom = 1;
+        const zoomStep = 0.2;
+        const minZoom = 0.5;
+        const maxZoom = 3;
+
+        // Chat screen zoom functionality
+        let chatCurrentZoom = 1;
+        const chatZoomStep = 0.2;
+        const chatMinZoom = 0.5;
+        const chatMaxZoom = 2;
+
+        function chatZoomIn() {
+            if (chatCurrentZoom < chatMaxZoom) {
+                chatCurrentZoom = Math.min(chatCurrentZoom + chatZoomStep, chatMaxZoom);
+                applyChatZoom();
+            }
+        }
+
+        function chatZoomOut() {
+            if (chatCurrentZoom > chatMinZoom) {
+                chatCurrentZoom = Math.max(chatCurrentZoom - chatZoomStep, chatMinZoom);
+                applyChatZoom();
+            }
+        }
+
+        function chatResetZoom() {
+            chatCurrentZoom = 1;
+            applyChatZoom();
+        }
+
+        function applyChatZoom() {
+            const invoiceImage = document.getElementById('invoiceImage');
+            const chatZoomLevel = document.getElementById('chatZoomLevel');
+            const demoChatZoomLevel = document.getElementById('demoChatZoomLevel');
+            
+            if (invoiceImage && !invoiceImage.classList.contains('d-none')) {
+                invoiceImage.style.transform = `scale(${chatCurrentZoom})`;
+                invoiceImage.style.transformOrigin = 'center';
+                if (chatZoomLevel) chatZoomLevel.textContent = `${Math.round(chatCurrentZoom * 100)}%`;
+            }
+            
+            // Update demo zoom level indicator
+            if (demoChatZoomLevel) {
+                demoChatZoomLevel.textContent = `${Math.round(chatCurrentZoom * 100)}%`;
+            }
+        }
+
+        // Demo chat zoom functions
+        function demoChatZoomIn() {
+            chatZoomIn();
+        }
+
+        function demoChatZoomOut() {
+            chatZoomOut();
+        }
+
+        function demoChatResetZoom() {
+            chatResetZoom();
+        }
+
+        function openImageZoom() {
+            const invoiceImage = document.getElementById('invoiceImage');
+            const zoomedImage = document.getElementById('zoomedImage');
+            const modalFileName = document.getElementById('modalFileName');
+            const invoiceFileName = document.getElementById('invoiceFileName');
+            
+            if (invoiceImage.src) {
+                zoomedImage.src = invoiceImage.src;
+                modalFileName.textContent = invoiceFileName.textContent;
+                resetZoom();
+                
+                const modal = new bootstrap.Modal(document.getElementById('imageZoomModal'));
+                modal.show();
+            }
+        }
+
+        function zoomIn() {
+            if (currentZoom < maxZoom) {
+                currentZoom = Math.min(currentZoom + zoomStep, maxZoom);
+                applyZoom();
+            }
+        }
+
+        function zoomOut() {
+            if (currentZoom > minZoom) {
+                currentZoom = Math.max(currentZoom - zoomStep, minZoom);
+                applyZoom();
+            }
+        }
+
+        function resetZoom() {
+            currentZoom = 1;
+            applyZoom();
+        }
+
+        function applyZoom() {
+            const zoomedImage = document.getElementById('zoomedImage');
+            const zoomLevel = document.getElementById('zoomLevel');
+            
+            zoomedImage.style.transform = `scale(${currentZoom})`;
+            zoomLevel.textContent = `${Math.round(currentZoom * 100)}%`;
+        }
+
+        function toggleFullscreen() {
+            const modal = document.getElementById('imageZoomModal');
+            
+            if (!document.fullscreenElement) {
+                modal.requestFullscreen().catch(err => {
+                    console.log(`Error attempting to enable fullscreen: ${err.message}`);
+                });
+            } else {
+                document.exitFullscreen();
+            }
+        }
+
+        function downloadImage() {
+            const invoiceImage = document.getElementById('invoiceImage');
+            const invoiceFileName = document.getElementById('invoiceFileName');
+            
+            if (invoiceImage.src) {
+                const link = document.createElement('a');
+                link.href = invoiceImage.src;
+                link.download = invoiceFileName.textContent || 'invoice.jpg';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+        }
+
+        // Mouse wheel zoom in modal
+        document.getElementById('imageZoomModal').addEventListener('wheel', function(e) {
+            if (e.ctrlKey) {
+                e.preventDefault();
+                if (e.deltaY < 0) {
+                    zoomIn();
+                } else {
+                    zoomOut();
+                }
+            }
+        });
+
+        // Keyboard shortcuts for zoom
+        document.addEventListener('keydown', function(e) {
+            const modal = document.getElementById('imageZoomModal');
+            if (modal.classList.contains('show')) {
+                switch(e.key) {
+                    case '+':
+                    case '=':
+                        e.preventDefault();
+                        zoomIn();
+                        break;
+                    case '-':
+                        e.preventDefault();
+                        zoomOut();
+                        break;
+                    case '0':
+                        e.preventDefault();
+                        resetZoom();
+                        break;
+                    case 'f':
+                    case 'F':
+                        e.preventDefault();
+                        toggleFullscreen();
+                        break;
+                    case 'Escape':
+                        if (document.fullscreenElement) {
+                            document.exitFullscreen();
+                        }
+                        break;
+                }
+            }
+        });
+    </script>
+
+    <!-- Footer -->
+    <footer class="bg-light py-4 mt-5">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-6">
+                    <p class="mb-0 text-muted">
+                        <i class="fas fa-file-invoice me-2"></i>
+                        Invoice Extraction & Chatbot
+                    </p>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <p class="mb-0 text-muted">
+                        Made with ❤️ by TecoNico Pvt. Ltd.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

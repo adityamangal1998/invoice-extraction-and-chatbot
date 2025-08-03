@@ -1,0 +1,154 @@
+import json
+import faiss
+import numpy as np
+from sentence_transformers import SentenceTransformer
+from typing import List, Dict, Any
+import logging
+
+logger = logging.getLogger(__name__)
+
+class InvoiceChatbot:
+    def __init__(self):
+        """Initialize the chatbot with sentence transformer and FAISS index."""
+        self.model = SentenceTransformer('all-MiniLM-L6-v2')
+        self.index = None
+        self.documents = []
+        self.invoice_data = {}
+        
+    def prepare_documents(self, invoice_data: Dict[str, Any]) -> List[str]:
+        """
+        Convert invoice data into searchable text documents.
+        
+        Args:
+            invoice_data: Extracted invoice data dictionary
+            
+        Returns:
+            List of text documents for RAG
+        """
+        documents = []
+        self.invoice_data = invoice_data
+        
+        # Convert invoice data to searchable text chunks
+        if isinstance(invoice_data, dict):
+            for key, value in invoice_data.items():
+                if isinstance(value, (str, int, float)):
+                    documents.append(f"{key}: {value}")
+                elif isinstance(value, list):
+                    for i, item in enumerate(value):
+                        if isinstance(item, dict):
+                            for sub_key, sub_value in item.items():
+                                documents.append(f"{key} item {i+1} {sub_key}: {sub_value}")
+                        else:
+                            documents.append(f"{key} item {i+1}: {item}")
+                elif isinstance(value, dict):
+                    for sub_key, sub_value in value.items():
+                        documents.append(f"{key} {sub_key}: {sub_value}")
+        
+        # Add some general document about the invoice
+        if documents:
+            documents.append(f"This is invoice data containing information about: {', '.join(invoice_data.keys())}")
+        
+        self.documents = documents
+        return documents
+    
+    def build_index(self, documents: List[str]):
+        """
+        Build FAISS index from documents.
+        
+        Args:
+            documents: List of text documents
+        """
+        if not documents:
+            logger.warning("No documents to index")
+            return
+            
+        try:
+            # Generate embeddings
+            embeddings = self.model.encode(documents)
+            
+            # Create FAISS index
+            dimension = embeddings.shape[1]
+            self.index = faiss.IndexFlatIP(dimension)  # Inner product for cosine similarity
+            
+            # Normalize embeddings for cosine similarity
+            faiss.normalize_L2(embeddings)
+            
+            # Add to index
+            self.index.add(embeddings.astype(np.float32))
+            
+            logger.info(f"Built FAISS index with {len(documents)} documents")
+            
+        except Exception as e:
+            logger.error(f"Error building FAISS index: {str(e)}")
+            self.index = None
+    
+    def search_similar_documents(self, query: str, k: int = 3) -> List[str]:
+        """
+        Search for similar documents using FAISS.
+        
+        Args:
+            query: Search query
+            k: Number of top results to return
+            
+        Returns:
+            List of most similar documents
+        """
+        if self.index is None or not self.documents:
+            return self.documents[:k] if self.documents else []
+        
+        try:
+            # Generate query embedding
+            query_embedding = self.model.encode([query])
+            faiss.normalize_L2(query_embedding)
+            
+            # Search
+            scores, indices = self.index.search(query_embedding.astype(np.float32), min(k, len(self.documents)))
+            
+            # Return documents
+            similar_docs = []
+            for idx in indices[0]:
+                if idx < len(self.documents):
+                    similar_docs.append(self.documents[idx])
+            
+            return similar_docs
+            
+        except Exception as e:
+            logger.error(f"Error searching documents: {str(e)}")
+            return self.documents[:k] if self.documents else []
+    
+    def get_context_for_question(self, question: str) -> str:
+        """
+        Get relevant context for a question using RAG.
+        
+        Args:
+            question: User's question
+            
+        Returns:
+            Relevant context string
+        """
+        if not self.documents:
+            return json.dumps(self.invoice_data, indent=2)
+        
+        # Search for relevant documents
+        relevant_docs = self.search_similar_documents(question, k=5)
+        
+        # Combine with full invoice data for comprehensive context
+        context_parts = [
+            "Relevant Invoice Information:",
+            "\n".join(relevant_docs),
+            "\nFull Invoice Data:",
+            json.dumps(self.invoice_data, indent=2)
+        ]
+        
+        return "\n\n".join(context_parts)
+    
+    def update_invoice_data(self, invoice_data: Dict[str, Any]):
+        """
+        Update the chatbot with new invoice data.
+        
+        Args:
+            invoice_data: New invoice data dictionary
+        """
+        documents = self.prepare_documents(invoice_data)
+        self.build_index(documents)
+        logger.info("Updated chatbot with new invoice data")
