@@ -401,14 +401,14 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 ## 📞 Support
 
 - **Issues**: [GitHub Issues](https://github.com/adityamangal1998/invoice-extraction-and-chatbot/issues)
-- **Email**: adityamangal1998@gmail.com
+- **Email**: adityamangal98@gmail.com
 - **Documentation**: [Wiki](https://github.com/adityamangal1998/invoice-extraction-and-chatbot/wiki)
 
 ---
 
 <div align="center">
 
-**Made with ❤️ by [TecoNico Pvt. Ltd.](https://github.com/adityamangal1998)**
+**Made with ❤️ by [Aditya Mangal](https://github.com/adityamangal1998)**
 
 ⭐ **Star this repo if you find it helpful!**
 
